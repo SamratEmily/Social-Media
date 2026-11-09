@@ -388,8 +388,8 @@ const Feed: React.FC<FeedProps> = ({ onLogout }) => {
                     </svg>
                   </a>
                 </li>
-                <li className="nav-item _header_nav_item">
-                  <span 
+                <li className="nav-item _header_nav_item" style={{ position: 'relative' }}>
+                  <span
                     className="nav-link _header_nav_link _header_notify_btn"
                     onClick={() => setShowNotifications(!showNotifications)}
                   >
