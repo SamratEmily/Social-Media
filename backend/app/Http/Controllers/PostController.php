@@ -12,6 +12,18 @@ use Illuminate\Support\Facades\Storage;
 
 class PostController extends Controller
 {
+    /**
+     * Abort with 404 unless the current user may see the post.
+     * Private posts are visible only to their owner. 404 (not 403)
+     * avoids revealing that a private post exists.
+     */
+    private function ensureCanView(Post $post): void
+    {
+        if ($post->is_private && (int) $post->user_id !== (int) auth()->id()) {
+            abort(404);
+        }
+    }
+
     public function index()
     {
         $userId = auth()->id();
@@ -108,7 +120,7 @@ class PostController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'content' => 'required_without:image|nullable|string|max:5000',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
             'is_private' => 'nullable|boolean',
         ]);
 
@@ -122,9 +134,9 @@ class PostController extends Controller
 
         $imageUrl = null;
         if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $imageName = time() . '_' . $image->getClientOriginalName();
-            $imagePath = $image->storeAs('posts', $imageName, 'public');
+            // store() generates a random, extension-safe filename; never trust
+            // the client-supplied name (path chars, collisions, overwrites).
+            $imagePath = $request->file('image')->store('posts', 'public');
             $imageUrl = Storage::url($imagePath);
         }
 
@@ -164,6 +176,7 @@ class PostController extends Controller
     public function like(Request $request, $id)
     {
         $post = Post::findOrFail($id);
+        $this->ensureCanView($post);
         $userId = auth()->id();
 
         // Check if already liked
@@ -205,6 +218,7 @@ class PostController extends Controller
     public function getComments($id)
     {
         $post = Post::findOrFail($id);
+        $this->ensureCanView($post);
         $userId = auth()->id();
 
         $comments = Comment::where('post_id', $post->id)
@@ -276,7 +290,8 @@ class PostController extends Controller
     public function addComment(Request $request, $id)
     {
         $post = Post::findOrFail($id);
-        
+        $this->ensureCanView($post);
+
         $validator = Validator::make($request->all(), [
             'content' => 'required|string|max:1000',
         ]);
@@ -323,7 +338,8 @@ class PostController extends Controller
 
     public function likeComment(Request $request, $id)
     {
-        $comment = Comment::findOrFail($id);
+        $comment = Comment::with('post')->findOrFail($id);
+        $this->ensureCanView($comment->post);
         $userId = auth()->id();
 
         $like = Like::where('user_id', $userId)
@@ -363,8 +379,9 @@ class PostController extends Controller
 
     public function addReply(Request $request, $commentId)
     {
-        $comment = Comment::findOrFail($commentId);
-        
+        $comment = Comment::with('post')->findOrFail($commentId);
+        $this->ensureCanView($comment->post);
+
         $validator = Validator::make($request->all(), [
             'content' => 'required|string|max:1000',
         ]);
@@ -410,7 +427,8 @@ class PostController extends Controller
 
     public function likeReply(Request $request, $id)
     {
-        $reply = Reply::findOrFail($id);
+        $reply = Reply::with('comment.post')->findOrFail($id);
+        $this->ensureCanView($reply->comment->post);
         $userId = auth()->id();
 
         $like = Like::where('user_id', $userId)

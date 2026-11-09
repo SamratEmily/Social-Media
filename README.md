@@ -111,3 +111,10 @@ The application will be available at the URL shown in the terminal (usually `htt
 
 - Ensure both the backend (`php artisan serve`) and frontend (`npm run dev`) servers are running simultaneously for the application to function correctly.
 - The frontend is configured to communicate with the backend API. If you change the backend port, make sure to update the API base URL in the frontend configuration.
+
+## Security Notes
+
+- **Private posts** are visible only to their owner. Every post, comment, reply and like endpoint checks this and returns `404` for other users.
+- **Rate limiting**: `/api/login` and `/api/register` allow 5 requests per minute per IP. Authenticated endpoints allow 60 per minute.
+- **Uploads**: images must be jpeg/png/jpg/gif, at most 5 MB, and are saved under random server-generated filenames.
+- **Token storage**: the JWT is kept in `localStorage` to keep this demo simple. Any XSS on the frontend could read it. For production, issue the token in an `HttpOnly`, `Secure`, `SameSite` cookie instead. The token is removed on logout and on any `401` response.

@@ -63,6 +63,11 @@ class ApiService {
       const response = await fetch(url, config);
       const data = await response.json();
 
+      if (response.status === 401) {
+        // Token expired or revoked: discard it so it is not reused.
+        this.removeToken();
+      }
+
       if (!response.ok) {
         throw new Error(data.message || 'Request failed');
       }
@@ -101,12 +106,15 @@ class ApiService {
   }
 
   async logout(): Promise<ApiResponse> {
-    const response = await this.request('/logout', {
-      method: 'POST',
-    });
-
-    this.removeToken();
-    return response;
+    try {
+      return await this.request('/logout', {
+        method: 'POST',
+      });
+    } finally {
+      // Always drop the local token, even if the server call fails
+      // (e.g. token already expired), so a stale credential never lingers.
+      this.removeToken();
+    }
   }
 
   async getUser(): Promise<ApiResponse> {
@@ -146,6 +154,11 @@ class ApiService {
     try {
       const response = await fetch(url, config);
       const data = await response.json();
+
+      if (response.status === 401) {
+        // Token expired or revoked: discard it so it is not reused.
+        this.removeToken();
+      }
 
       if (!response.ok) {
         throw new Error(data.message || 'Request failed');
